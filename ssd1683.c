@@ -4,7 +4,7 @@
 #include "hardware/spi.h"
 #include "ssd1683.h"
 
-unsigned char reverse(unsigned char b)
+uint8_t reverse(uint8_t b)
 {
     b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
     b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
@@ -29,7 +29,7 @@ void wait_not_busy(SSD1683 display)
     } while (gpio_get(display.busy) != 0);
 }
 
-int write_data(SSD1683 display, int data)
+uint8_t write_data(SSD1683 display, uint8_t data)
 {
     uint8_t buf[1];
     buf[0] = data;
