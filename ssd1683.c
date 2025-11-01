@@ -1,10 +1,14 @@
 #include <stdio.h>
 
 #include "pico/stdlib.h"
+#include "font.h"
 #include "hardware/spi.h"
 #include "ssd1683.h"
+#include <string.h>
+#include <math.h>
+#include <stdlib.h>
 
-uint8_t reverse(uint8_t b)
+unsigned char reverse(unsigned char b)
 {
     b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
     b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
@@ -15,9 +19,9 @@ uint8_t reverse(uint8_t b)
 void reset(SSD1683 display)
 {
     gpio_put(display.reset, 0);
-    sleep_ms(10);
+    sleep_ms(40);
     gpio_put(display.reset, 1);
-    sleep_ms(10);
+    sleep_ms(40);
 }
 
 void wait_not_busy(SSD1683 display)
@@ -29,7 +33,7 @@ void wait_not_busy(SSD1683 display)
     } while (gpio_get(display.busy) != 0);
 }
 
-uint8_t write_data(SSD1683 display, uint8_t data)
+int write_data(SSD1683 display, int data)
 {
     uint8_t buf[1];
     buf[0] = data;
@@ -112,6 +116,7 @@ uint32_t write_ram(SSD1683 display, uint16_t width, uint16_t height, uint16_t x,
     }
 
     uint16_t written = spi_write_blocking(display.spi, data, size);
+    printf("%d\n", written);
 
     gpio_put(display.cs, 1);
 
@@ -152,4 +157,68 @@ int init_display(SSD1683 display, uint16_t width, uint16_t height)
     wait_not_busy(display);
 
     return 0;
+}
+
+int overlay_image(SSD1683 display, const uint8_t *image, uint16_t width, uint16_t height, uint16_t x, uint16_t y) {
+    uint16_t end_offset = width % 8;
+    uint16_t start_offset = 0;
+    uint16_t actual_pos = 0;
+
+    for (uint16_t i = 0; i < height; i++) {
+        for (uint16_t j = 0; j < width/8; j++) {
+            const uint16_t orig_pos = x/8 + j + display.width/8 * (i+y);
+            display.framebuffer[orig_pos] = image[i*(width/8) + j] | display.framebuffer[orig_pos];
+        }
+    }
+
+    return 0;
+}
+
+int rotate_and_overlay_image(SSD1683 display, const uint8_t *image, uint16_t width, uint16_t height, uint16_t x, uint16_t y, int8_t angle) {
+    uint8_t* rotated_image = calloc(width/8*height, sizeof(uint8_t));
+
+    double sinma = sin(-angle);
+    double cosma = cos(-angle);
+
+    int hwidth = width / 2;
+    int hheight = height / 2;
+
+    for(int xi = 0; xi < width; xi++) {
+        int xt = xi - hwidth;
+        for(int yi = 0; yi < height; yi++) {
+            uint8_t color = image[xi/8 + yi*(width/8)] & 0x01 << xi%8;
+            if (!color) {
+                continue;
+            }
+            int yt = yi - hheight;
+
+            int xs = (int)round((cosma * xt - sinma * yt) + hwidth);
+            int ys = (int)round((sinma * xt + cosma * yt) + hheight);
+
+            if(xs >= 0 && xs < width && ys >= 0 && ys < height) {
+                rotated_image[xs/8 + ys*(width/8)] |= 0x01 << xs%8;
+            }
+        }
+    }
+
+    const int result = overlay_image(display, rotated_image, width, height, x, y);
+    free(rotated_image);
+
+    return result;
+}
+
+int overlay_text(SSD1683 display, const char *text, size_t text_size, uint16_t x, uint16_t y) {
+    uint8_t* text_image = malloc(text_size*sizeof(char)*8);
+
+    for (size_t i = 0; i < text_size; i++) {
+        for(int j = 0; j < 8; j++) {
+            text_image[i + j*text_size] = font[text[i]-0x20][j];
+        }
+    }
+
+    const int result = overlay_image(display, text_image, text_size*8, 8, x, y);
+
+    free(text_image);
+
+    return result;
 }

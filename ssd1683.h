@@ -2,6 +2,7 @@
 #define _inc_ssd1683
 
 #include "pico/stdlib.h"
+#include "hardware/spi.h"
 
 // RAM targets
 #define BW_RAM 0x24
@@ -16,6 +17,8 @@
  *  @brief structure representing a SSD1683-driven display
  */
 typedef struct ssd_1683_display {
+	char* framebuffer;
+
     spi_inst_t* spi; /** pointer to SPI instance */
     uint16_t width; /** width of display */
     uint16_t height; /** height of display */
@@ -100,4 +103,49 @@ uint32_t write_full_ram(SSD1683 display, uint8_t target, uint8_t* data);
 **/
 int init_display(SSD1683 display, uint16_t width, uint16_t height);
 
+
+/**
+ 	@brief overlay image on top of framebuffer
+
+	@param[in] display : display to target
+	@param[in] image : image to overlay
+	@param[in] width : width of image
+	@param[in] height : height of image
+	@param[in] x : x anchor of image
+	@param[in] y : y anchor of image
+
+    @return write status
+    @retval 0 for success
+**/
+int overlay_image(SSD1683 display, const uint8_t *image, uint16_t width, uint16_t height, uint16_t x, uint16_t y);
+
+/**
+ 	@brief rotate and overlay image on top of framebuffer
+
+	@param[in] display : display to target
+	@param[in] image : image to overlay
+	@param[in] width : width of image
+	@param[in] height : height of image
+	@param[in] x : x anchor of image
+	@param[in] y : y anchor of image
+	@param[in] angle: degrees of rotation
+
+    @return write status
+    @retval 0 for success
+**/
+int rotate_and_overlay_image(SSD1683 display, const uint8_t *image, uint16_t width, uint16_t height, uint16_t x, uint16_t y, int8_t angle);
+
+/**
+ 	@brief overlay image on top of framebuffer
+
+	@param[in] display : display to target
+	@param[in] text : text to overlay
+	@param[in] text_size : number of text characters
+	@param[in] x : x anchor of image
+	@param[in] y : y anchor of image
+
+    @return write status
+    @retval 0 for success
+**/
+int overlay_text(SSD1683 display, const char *text, size_t text_size, uint16_t x, uint16_t y);
 #endif
